@@ -51,11 +51,10 @@ The `motor` and `grain` objects have built-in functions (methods) you can call d
 > motor.grain.tb
 8.95849341578629
 ```
-Or you can query the `motor` object for its initial chamber pressure:
+Or you can query the `motor` object for its initial thrust:
 ```
-> motor.pressure(0)
-302.75345835292035
-
+> motor.thrust(0)
+8211.251083700156
 ```
 For plotting motor performance, you can request a *state vector* with the `motor.burn_vector()` method. This method accepts a timestep and returns a state vector of the form `[ time, burn distance, pressure, thrust, specific impulse]`. You can then use `matplotlib` or your preferred plotting library to display the results:
 
