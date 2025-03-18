@@ -50,16 +50,16 @@ motor = motor(
                    specific_heat_ratio=1.24,  # "Gamma" or "k"
                    cstar=5343,                # Characteristic velocity
                    MW=25.3                    # Molecular weight
-                   ),
+  ),
   motor.cpgrain(Ro=8,                         # Outer radius (in)
                 Ri=4,                         # Inner (perforation) radius (in)
                 length=60                     # Length of grain (in)
-                ),
+  ),
   motor.nozzle(throat_diameter=5,
                Me=2.5,                        # Exit Mach number
                Pe=14.7,                       # Exit pressure (psi)
                Pa=14.7                        # Ambient pressure (psi)
-               ),
+  ),
 )
 ```
 The `motor` and `grain` objects have built-in functions (methods) you can call directly. For instance, you can query the `grain` object for the burnout time:
