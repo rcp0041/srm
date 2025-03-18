@@ -11,7 +11,8 @@ Tool for modeling solid rocket motor performance.
    `.venv\Scripts\activate` (Windows)
 3. Install the project requirements.
    1. `pip install -e .`
-4. Use `import srm` in a Python project (must be inside the activated venv if applicable.)
+4. Run the example script (and then read below to see how it works):
+   1. `python example/cpgrain.py'
 
 ***
 
