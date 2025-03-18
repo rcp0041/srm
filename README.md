@@ -51,7 +51,7 @@ The `motor` and `grain` objects have built-in functions (methods) you can call d
 > motor.grain.tb
 8.95849341578629
 ```
-Or you can query the `motor` object for its initial chamber pressure:
+Or you can query the `motor` object for its initial thrust:
 ```
 > motor.thrust(0)
 8211.251083700156
