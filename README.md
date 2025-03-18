@@ -91,6 +91,17 @@ plt.show()
 ![A thrust-time plot generated with matplotlib](https://github.com/rcp0041/srm/blob/main/example/thrust.png?raw=true)
 
 ***
+## Options
+
+You can create motors as specified in the example problem. You may create any of the following grain types:
+
+- CP grains:
+   - `motor.cpgrain(Ro,Ri,length)`
+- Star grains:
+   - `motor.stargrain(N,Ro,Ri,Rp,f,epsilon,halfTheta,length)`
+- Wagon wheel grains:
+   - (Short- or long-spoke configurations are automatically detected.)
+   - `motor.wagonwheelgrain(N,Ro,Ri,Rp,f,epsilon,halfTheta,length)`
 
 ## Project Goals
 
@@ -100,6 +111,7 @@ A modular object-based approach to solid rocket performance modeling. Propellant
 
 - [ ] Integrate [AstroPy](https://docs.astropy.org/en/stable/units/) for handling dimensional quantities. (The current codebase only works with US units.)
 - [ ] Provide a standard library of propellants.
+- [ ] Add more grain types (e.g. tubular, rod-in-tube, slotted grain, spherical grain, end-burning grain)
 - [ ] Create full documentation on functions.
 
 ### Expected Outputs
