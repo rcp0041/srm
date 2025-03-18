@@ -12,7 +12,7 @@ Tool for modeling solid rocket motor performance.
 3. Install the project requirements.
    1. `pip install -e .`
 4. Run the example script (and then read below to see how it works):
-   1. `python example/cpgrain.py'
+   1. `python example/cpgrain.py`
 
 ***
 
