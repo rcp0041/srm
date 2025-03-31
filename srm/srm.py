@@ -3,9 +3,16 @@
 """
 Solid Rocket Motor library
 Created on Wed Mar 12 22:43:15 2025
-
 @author: Ray Patrick
 """
+
+# TODO: Add bool phase1_neutral to star and WW grains
+# TODO: Implement grain type checking at grain rather than motor declaration
+# TODO: Implement table of common propellants
+# TODO: Implement neutral WW theta table (slide 4:71)
+# TODO: Implement slotted, spherical, tubular, and rod-in-tube grains
+# TODO: Have a "design_altitude" attribute for the nozzle that queries the standard atmosphere! (And allows to set exit and ambient pressure dynamically)
+
 
 import numpy as np                    # Numerical operations
 from scipy import optimize            # Root finder
@@ -14,41 +21,75 @@ from scipy import optimize            # Root finder
 Ru = 1545
 g0 = 32.174
 
+def create_dict(obj):
+    keys = [x for x in dir(obj) if not (x.startswith('__') or x.startswith('propellant'))]
+    values = []
+    for key in keys:
+        values.append(getattr(obj,key))
+    dictionary = {k: v for k, v in zip(keys, values)}
+    return dictionary
+
+def print_dict(dictionary):
+    a = ""
+    for i in dictionary:
+        a = a + f"{i}: {dictionary[i]}\n"
+    return a
+
+class dummy_updater(object):
+    def __init__(self, iterable=(), **kwargs):
+        self.__dict__.update(iterable, **kwargs)
+
 class motor:
     def __init__(self,propellant,grain,nozzle):
         self.propellant = propellant
-        self.grain = grain
         self.nozzle = nozzle
-        
-        # Isentropic relations
-        if self.nozzle.P0 != None and self.nozzle.throat_area == None:
-            self.nozzle.throat_area = (self.grain.Ab(0)*self.propellant.a*self.propellant.density*self.propellant.cstar)/(g0*self.nozzle.P0**(1-self.propellant.n))
-        
-        if self.nozzle.expansion_ratio != None and self.nozzle.throat_area != None:
-            def f(Me):
-                gamma = self.propellant.specific_heat_ratio
-                return (1/Me)*((2/(gamma+1))*(1 + ((gamma-1)/2)*Me**2))**((gamma+1)/(2*(gamma-1))) - nozzle.expansion_ratio
-            self.nozzle.Me = optimize.root_scalar(f, method='newton',x0=2).root
-        
-        # if self.nozzle.expansion ratio != None and self.nozzle.Pe != None and self.nozzle.Pa != None and self.nozzle.P0 != None:
-            # self.nozzle.thrust_coefficient = self.nozzle.expansion_ratio*(self.nozzle.Pe-self.nozzle.Pa)/self.nozzle.P0
-            
-        if self.nozzle.Me == None and self.nozzle.P0 != None and self.nozzle.Pe != None:
-            def f(Me):
-                return (1 + 0.5*(self.propellant.specific_heat_ratio-1)*Me**2)**(self.propellant.specific_heat_ratio/(self.propellant.specific_heat_ratio-1))
-            self.nozzle.Me = optimize.root_scalar(f, method='newton',x0=1).root
 
-        if self.nozzle.Me != None:
-            self.nozzle.pressure_ratio = (1 + ((self.propellant.specific_heat_ratio-1)/2)*self.nozzle.Me**2)**(self.propellant.specific_heat_ratio/(self.propellant.specific_heat_ratio-1))
-            self.nozzle.temperature_ratio = self.nozzle.pressure_ratio**((self.propellant.specific_heat_ratio-1)/self.propellant.specific_heat_ratio)
-            self.nozzle.area_ratio = (1/self.nozzle.Me)*((2/(self.propellant.specific_heat_ratio+1))*(1+((self.propellant.specific_heat_ratio-1)/2)*self.nozzle.Me**2))**((self.propellant.specific_heat_ratio+1)/(2*(self.propellant.specific_heat_ratio-1)))
+        # Do star/wagon wheel check before assigning self.grain        
+        if grain.graintype == "star" or grain.graintype == "wagonwheel":
+            # Perform spoke-adjacency check
+            grain.delta = np.arctan(
+                (grain.Rp*np.sin(grain.epsilonAngle)-grain.f)/
+                (grain.Ri + (grain.f/np.sin(grain.halfTheta)) + (grain.Rp*np.sin(grain.epsilonAngle)-grain.f)/np.tan(grain.halfTheta))
+                )
+            if grain.delta >= np.pi/grain.N:
+                print("Maximum spoke length exceeded. Recheck your design parameters!")
+                exit(1)
+            # Detect star (h < 0) or wagon wheel (h > 0)
+            grain.h = (grain.Rp*np.cos(grain.epsilonAngle)-((grain.Rp*np.sin(grain.epsilonAngle)/(np.tan(grain.halfTheta))))-grain.Ri)*np.sin(grain.halfTheta)
+            if grain.h > 0:
+                # Detect type of wagon wheel
+                if grain.Rp*np.cos(grain.epsilonAngle)-grain.Ri-((grain.Rp*np.sin(grain.epsilonAngle))/(np.sin(grain.halfTheta))) > 0:
+                    actualgraintype = "longspokewagonwheel"
+                else:
+                    actualgraintype = "shortspokewagonwheel"       
+            else:
+                actualgraintype = "star"
+        # Now change the graintype (if required)
+            if grain.graintype != actualgraintype:
+                if grain.graintype == "wagonwheel" and (actualgraintype == "shortspokewagonwheel" or actualgraintype == "longspokewagonwheel"):
+                    pass
+                else:
+                    print("You defined it as a {}, but this grain is a {}.".format(grain.graintype,actualgraintype))
+                    print("Reinitializing the grain as a {}.".format(actualgraintype))
+                if actualgraintype == "star":
+                    newgrain = stargrain(grain.N,grain.Ro,grain.Ri,grain.Rp,grain.f,grain.epsilon,grain.halfTheta,grain.length)
+                elif actualgraintype == "longspokewagonwheel" or actualgraintype == "shortspokewagonwheel":
+                    newgrain = wagonwheelgrain(grain.N,grain.Ro,grain.Ri,grain.Rp,grain.f,grain.epsilon,grain.halfTheta,grain.length)
+                    newgrain.graintype = actualgraintype
+                self.grain = newgrain
+            elif grain.graintype == actualgraintype:
+                self.grain = grain
+        else:
+            self.grain = grain
         
-            self.nozzle.Te = self.propellant.temperature/self.nozzle.temperature_ratio
-            self.nozzle.Ae = self.nozzle.throat_area * self.nozzle.area_ratio
-            self.nozzle.ue = self.nozzle.Me * np.sqrt(self.propellant.specific_heat_ratio*self.propellant.R*g0*self.nozzle.Te)
-            
-        # Grain-specific stuff
+        if self.grain.graintype == "endburning":
+            if hasattr(self.nozzle,'throat_area') and not hasattr(self.nozzle,'chamber_pressure'):
+                self.nozzle.chamber_pressure = self.pressure(0)
+                self.nozzle.recalculate()
+            self.grain.burn_rate = self.propellant.a * self.nozzle.chamber_pressure ** self.propellant.n
+            self.grain.burn_time = self.grain.length / self.grain.burn_rate
         if self.grain.graintype == "CP":
+            self.grain.n = self.propellant.n
             # Burn rate
             self.grain.K1 = (2*np.pi*self.grain.length*self.propellant.a*((self.propellant.a*self.propellant.cstar*self.propellant.density)/(g0*self.nozzle.throat_area))**(self.propellant.n/(1-self.propellant.n)))
             self.grain.K2 = self.grain.K1*((2*self.propellant.n-1)/(self.propellant.n-1))
@@ -57,15 +98,53 @@ class motor:
             self.grain.p = (2*self.propellant.n - 1)/(self.propellant.n-1)
             if self.propellant.n != 0.5:
                 self.grain.q = 1/self.grain.p
-                self.grain.tb = (self.grain.Abf**((2*self.propellant.n-1)/(self.propellant.n-1)) - self.grain.Abi**((2*self.propellant.n-1)/(self.propellant.n-1)))/self.grain.K2
+                self.grain.burn_time = (self.grain.Abf**((2*self.propellant.n-1)/(self.propellant.n-1)) - self.grain.Abi**((2*self.propellant.n-1)/(self.propellant.n-1)))/self.grain.K2
             elif self.propellant.n == 0.5:
-                self.grain.tb = np.log(self.grain.Abf)/(np.log(self.grain.Abi)*self.grain.K1)
-        elif self.grain.graintype == "star":
-            # Burn rate
-            if self.nozzle.P0 != None:
-                self.grain.r0 = self.propellant.a*self.nozzle.P0**self.propellant.n
-                if self.grain.neutrality == 0:
-                    self.grain.tb_phase1 = self.grain.web1/self.grain.r0
+                self.grain.burn_time = np.log(self.grain.Abf)/(np.log(self.grain.Abi)*self.grain.K1)
+        
+        """ Nozzle stuff """
+        if hasattr(self.propellant,'specific_heat_ratio'):
+            self.nozzle.k = self.propellant.specific_heat_ratio
+        
+        if hasattr(self.propellant,'temperature'):
+            self.nozzle.__recalculate__(chamber_temperature=self.propellant.temperature)
+            self.nozzle.__recalculate__()
+            
+        if hasattr(self.nozzle,'throat_area') and not hasattr(self.nozzle,'chamber_pressure'):
+            self.nozzle.chamber_pressure = self.pressure(0)
+            self.nozzle.__recalculate__()
+            
+        if hasattr(self.nozzle,'exit_temperature') and hasattr(self.nozzle,'chamber_temperature') and hasattr(self.propellant,'R'):
+            self.nozzle.exit_velocity = np.sqrt(2 * (self.propellant.specific_heat_ratio)/(self.propellant.specific_heat_ratio-1) * self.propellant.R * g0 * (self.nozzle.chamber_temperature - self.nozzle.exit_temperature))
+            self.nozzle.__recalculate__()
+        
+    def pressure(self,x):
+        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
+        return self.grain.pressure(x,self.nozzle,self.propellant)
+    
+    def mass_flow_rate(self,x):
+        """Slug/s. For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
+        return (self.pressure(x)*self.nozzle.throat_area)/self.propellant.cstar
+    
+    def propellant_mass(self,x):
+        """ 'x' is burn distance for all grain types """
+        return ((np.pi*self.grain.Ro**2) - self.grain.port_area(x))*self.grain.length*self.propellant.density
+    
+    def burn_rate(self,x):
+        """ For star grains, 'x' is burn distance """
+        return self.propellant.a * self.pressure(x)**self.propellant.n
+    
+    def thrust(self,x):
+        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
+        if hasattr(self.nozzle,'exit_area'):
+            return self.mass_flow_rate(x)*self.nozzle.exit_velocity + self.nozzle.exit_area*(self.nozzle.exit_pressure - self.nozzle.ambient_pressure)
+        elif hasattr(self.nozzle,'exit_pressure') and hasattr(self.nozzle,'ambient_pressure') and hasattr(self.nozzle,'exit_velocity'):
+            if self.nozzle.exit_pressure == self.nozzle.ambient_pressure:
+                return self.mass_flow_rate(x)*self.nozzle.exit_velocity
+    
+    def specific_impulse(self,x):
+        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
+        return self.thrust(x)/(self.mass_flow_rate(x)*g0)
     
     def burn_vector(self,timestep,initial_time=0):
         """ Returns a state vector """
@@ -73,13 +152,16 @@ class motor:
         t,y,r = initial_time,0,self.burn_rate(0)
         if self.grain.graintype == "CP":
             yf = self.grain.Ro - self.grain.Ri
-            while t < self.grain.tb:
+            while t < self.grain.burn_time:
                 t = t + timestep
                 y = y + self.burn_rate(t)*timestep
                 r = self.burn_rate(t)
                 Y = np.vstack((Y,np.array([t,y,self.pressure(t),self.thrust(t),self.specific_impulse(t)])))    
         elif self.grain.graintype != "CP":
-            yf = self.grain.Ro - self.grain.Rp - self.grain.f
+            if self.grain.graintype == "endburning":
+                yf = self.grain.Ro
+            else:
+                yf = self.grain.Ro - self.grain.Rp - self.grain.f
             while y < yf:
                 t = t + timestep
                 y = y + r*timestep
@@ -87,294 +169,360 @@ class motor:
                 Y = np.vstack((Y,np.array([t,y,self.pressure(y),self.thrust(y),self.specific_impulse(y)])))
         return Y
     
-    def burn_rate(self,x):
-        """ For star grains, 'x' is burn distance """
-        return self.propellant.a * self.pressure(x)**self.propellant.n
-    
-    def burn_area(self,x):
-        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
-        if self.grain.graintype == "CP":
-            return self.grain.Ab(x,self.propellant.n)
-        else:
-            return self.grain.Ab(x)
-    
-    def pressure(self,x):
-        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
-        return self.grain.pressure(x,self.nozzle,self.propellant)
-    
-    def mdot(self,x):
-        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
-        return (self.pressure(x)*self.nozzle.throat_area)/self.propellant.cstar
-    
-    def prop_mass(self,x):
-        """ 'x' is burn distance for all grain types """
-        return ((np.pi*self.grain.Ro**2) - self.grain.Ap(x))*self.grain.length*self.propellant.density
+    def __str__(self):
+        a = self.propellant.__str__() + "\n"
+        a = a + self.grain.__str__() + "\n\n"
+        a = a + self.nozzle.__str__() + "\n"
+        # self.propellant.__str__()
+        # self.grain.__str__()
+        # self.nozzle.__str__()
+        return a
 
-    def thrust(self,x):
-        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
-        return self.mdot(x)*self.nozzle.ue + self.nozzle.Ae*(self.nozzle.Pe - self.nozzle.Pa)
+class nozzle(dummy_updater):
+    def __init__(self, iterable=(), **kwargs):
+        super().__init__(iterable, **kwargs)
+        
+        # Compute pressure ratio if possible
+        if hasattr(self,'exit_pressure') and hasattr(self,'chamber_pressure'):
+            self.pressure_ratio = self.exit_pressure/self.chamber_pressure
+            
+        # Compute throat area if possible (assumes circular cross-section)
+        if not hasattr(self,'throat_area'):
+            if hasattr(self,'throat_diameter'):
+                self.throat_area = np.pi * (self.throat_diameter/2)**2
+            elif hasattr(self,'propellant') and hasattr(self,'thrust') and hasattr(self,'chamber_pressure') and hasattr(self,'exit_pressure'):
+                self.thrust_coefficient = self.propellant.cap_gamma *np.sqrt(((2*self.propellant.specific_heat_ratio)/(self.propellant.specific_heat_ratio-1))*(1-(self.exit_pressure/self.chamber_pressure)**((self.propellant.specific_heat_ratio-1)/self.propellant.specific_heat_ratio)))
+                self.throat_area = self.thrust/(self.chamber_pressure * self.thrust_coefficient)
+                self.throat_diameter = np.sqrt((4*self.throat_area)/np.pi)
+          
+        # Compute exit temperature if possible
+        if hasattr(self,'chamber_temperature') and hasattr(self,'pressure_ratio') and hasattr(self,'k'):
+            self.exit_temperature = self.chamber_temperature * (self.pressure_ratio)**((self.k-1)/self.k)
+        
+        # Compute exit Mach number if possible
+        if hasattr(self,'k') and hasattr(self,'pressure_ratio'):
+            self.exit_mach = np.sqrt((2/(self.k-1)) * (((1/self.pressure_ratio) ** ((self.k-1)/self.k))-1))
+        
+        # Compute exit area if possible
+        if hasattr(self,'throat_area') and hasattr(self,'exit_mach') and hasattr(self,'k'):
+            self.exit_area = (self.throat_area/self.exit_mach)*((2/(self.k+1))*(1+(0.5*(self.k-1))*self.exit_mach**2))**((self.k+1)/(2*(self.k-1)))
+            
+    def __str__(self):
+        a = "Nozzle properties:\n"
+        a = a + print_dict(create_dict(self))
+        return a
     
-    def specific_impulse(self,x):
-        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
-        return self.thrust(x)/(self.mdot(x)*g0)
+    def __recalculate__(self,**kwargs):
+        """ Add nozzle parameters, then recompute all nozzle properties """
+        for k, val in kwargs.items():
+            setattr(self,k,val)
+        self.__init__(create_dict(self))
 
-    class propellant():
-        """ Solid rocket propellant """
-        def __init__(self,a,n,density,temperature,specific_heat_ratio,cstar,MW):
-            self.a = a
-            self.n = n
-            self.density = density
-            self.temperature = temperature
-            self.specific_heat_ratio = specific_heat_ratio
-            self.cstar = cstar
-            self.MW = MW
+class propellant:
+    """ Solid rocket propellant """
+    def __init__(self,a,n,density,temperature,specific_heat_ratio,cstar,MW,name=None):
+        self.name = name
+        self.a = a
+        self.n = n
+        self.density = density
+        self.temperature = temperature
+        self.specific_heat_ratio = specific_heat_ratio
+        self.cap_gamma = np.sqrt(self.specific_heat_ratio*(2/(self.specific_heat_ratio+1))**((self.specific_heat_ratio+1)/(self.specific_heat_ratio-1)))
+        self.cstar = cstar
+        self.MW = MW
+        # Compute specific gas constant from molecular weight or vice versa
+        if hasattr(self,'MW') and not hasattr(self,'R'):
             self.R = Ru/self.MW
+        if hasattr(self,'R') and not hasattr(self,'MW'):
+            self.MW = Ru/self.R
+        # Now compute specific heats
+        self.cv = self.R/(self.specific_heat_ratio - 1)
+        self.cp = self.cv * self.specific_heat_ratio
     
-    class grain():
-        """ Solid rocket fuel grain """
-        def pressure(self,x,nozzle,propellant):
-            """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
-            if self.graintype == "CP":
-                return (((self.Ab(x,propellant.n)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/g0)**(1/(1-propellant.n))
-            else:
-                return (((self.Ab(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/g0)**(1/(1-propellant.n))
-        
-    class cpgrain(grain):
-        """ Circular-perforated grain """
-        def __init__(self,Ro,Ri,length):
-            self.Ro = Ro
-            self.Ri = Ri
-            self.length = length
-            self.graintype = "CP"
-        
-        def Ab(self,t,n):
-            if n != 0.5:
-                return (self.K2*t + self.Abi**self.p)**self.q
-            elif n == 0.5:
-                return self.Abi * np.exp(self.K1*t)
-        
-        def Ap(self,y):
-            return np.pi*(self.Ri + y)**2 
-        
-    class stargrain(grain):
-        """ Internal burning star grain """
-        def __init__(self,N,Ro,Ri,Rp,f,epsilon,halfTheta,length):
-            self.N = N
-            self.Ro = Ro
-            self.Ri = Ri
-            self.Rp = Rp
-            self.f = f
-            self.epsilon = epsilon
-            self.halfTheta = halfTheta
-            self.length = length
-            self.graintype = "star"
-            
-            self.epsilonAngle = np.pi*self.epsilon/self.N
-            self.H1 = self.Rp*np.sin(self.epsilonAngle)
-            
-            if self.Ri == None:
-                self.Ri = self.find_neutral_Ri()
-                
-            if self.halfTheta == None:
-                self.halfTheta = np.arctan((self.H1*np.tan(self.epsilonAngle))/(self.H1 - self.Ri*np.tan(self.epsilonAngle)))
-            
-            self.web1 = (self.Rp*np.sin(self.epsilonAngle)/np.cos(self.halfTheta))-self.f
-            
-            self.beta = np.pi/2 - self.halfTheta + self.epsilonAngle
-        
-            coeff = np.pi/2 - self.halfTheta + np.pi/self.N - 1/np.tan(self.halfTheta)
-            if coeff == 0:
-                self.neutrality = 0
-            elif coeff > 1:
-                self.neutrality = 1
-            else:
-                self.neutrality = -1
-        
-        def phase(self,y):
-            y0 = self.H1/np.cos(self.halfTheta)
-            if (y + self.f) < y0:
-                return 1
-            else:
-                return 2
-            
-        def gamma(self,y):
-            return np.arctan((np.sqrt((y+self.f)**2 - self.H1**2))/self.H1)-self.halfTheta
-        
-        def burn_perimeter(self,y,S=None):
-            if self.phase(y) == 1:
-                S1 = self.H1/np.sin(self.halfTheta) - (y+self.f)/np.tan(self.halfTheta)
-                S2 = (y+self.f)*self.beta
-                S3 = (self.Rp + y + self.f)*(np.pi/self.N - self.epsilonAngle)
-            elif self.phase(y) == 2:
-                S1 = 0
-                S2 = (y+self.f)*(self.beta-self.gamma(y))
-                S3 = (self.Rp+y+self.f)*(np.pi/self.N - self.epsilonAngle)
-            if S == None:
-                return 2*self.N*(S1+S2+S3)
-            elif S == 1:
-                return S1
-            elif S == 2:
-                return S2
-            elif S == 3:
-                return S3
-                
-        def Ab(self, y):
-            burn_perimeter = self.burn_perimeter(y)
-            return burn_perimeter*self.length
-        
-        def Ap(self, y):
-            if self.phase(y) == 1:
-                S1 = self.burn_perimeter(y,1)
-                A1 = 0.5*self.H1*(self.Rp*np.cos(self.epsilonAngle)+self.H1*np.tan(self.halfTheta))-0.5*(S1**2)*np.tan(self.halfTheta)
-                A2 = 0.5*self.beta*(y+self.f)**2
-                A3 = 0.5*(np.pi/self.N - self.epsilonAngle)*(self.Rp+y+self.f)**2
-            elif self.phase(y) == 2:
-                A1 = 0.5*self.H1*(self.Rp*np.cos(self.epsilonAngle)+np.sqrt((y-self.f)**2 - self.H1**2))
-                A2 = 0.5*(self.beta - self.gamma(y))*(y+self.f)**2
-                A3 = 0.5*(np.pi/self.N - self.epsilonAngle)*(self.Rp + y + self.f)**2
-            return 2*self.N*(A1+A2+A3)
-        
-        def find_neutral_Ri(self):
-            def f(Ri):
-                return np.pi/2 + np.pi/self.N - np.arctan((self.H1*np.tan(self.epsilonAngle))/(self.H1 - Ri*np.tan(self.epsilonAngle))) - (self.H1 - Ri*np.tan(self.epsilonAngle))/(self.H1*np.tan(self.epsilonAngle))
-            return optimize.root_scalar(f, method='newton',x0=1).root
+    def __str__(self):
+        a = "Propellant properties:\n"
+        if self.name != None:
+            a = a + f"Name: {self.name}\n"
+        a = a + f"a: {self.a}\n"
+        a = a + f"n: {self.n}\n"
+        a = a + f"density: {self.density}\n"
+        a = a + f"Combustion temperature: {self.temperature}\n"
+        a = a + f"Specific heat ratio, gamma: {self.specific_heat_ratio}\n"
+        a = a + f"'Cap Gamma': {self.cap_gamma}\n"
+        a = a + f"Characteristic velocity, c*: {self.cstar}\n"
+        a = a + f"Molecular weight: {self.MW}\n"
+        a = a + f"Specific gas constant, R: {self.R}\n"
+        a = a + f"cv: {self.cv}\n"
+        a = a + f"cp: {self.cp}\n"
+        return a
+
+class grain():
+    """ Solid rocket fuel grain """
+    def __init__(self):
+        pass
     
-    class wagonwheelgrain(grain):
-        """ Short- or long-spoke wagon wheel grain """
-        def __init__(self,N,Ro,Ri,Rp,f,epsilon,halfTheta,length):
-            self.N = N
-            self.Ro = Ro
-            self.Ri = Ri
-            self.Rp = Rp
-            self.f = f
-            self.epsilon = epsilon
-            self.halfTheta = halfTheta
-            self.length = length
-            self.epsilonAngle = np.pi*self.epsilon/self.N
-            
-            self.delta = np.arctan(
-                (self.Rp*np.sin(self.epsilonAngle)-self.f)/
-                (self.Ri + (self.f/np.sin(self.halfTheta)) + (self.Rp*np.sin(self.epsilonAngle)-self.f)/np.tan(self.halfTheta))
-                )
-            if self.delta >= np.pi/self.N:
-                print("Maximum spoke length exceeded.")
-                exit(1)
-            
-            self.h = (self.Rp*np.cos(self.epsilonAngle)-((self.Rp*np.sin(self.epsilonAngle)/(np.tan(self.halfTheta))))-self.Ri)*np.sin(self.halfTheta)
-            if self.h > 0:
-                # A wagon wheel grain
-                if self.Rp*np.cos(self.epsilonAngle)-self.Ri-((self.Rp*np.sin(self.epsilonAngle))/(np.sin(self.halfTheta))) > 0:
-                    self.graintype = "longspokewagonwheel"
-                else:
-                    self.graintype = "shortspokewagonwheel"
-            else:
-                print("The wagon wheel generator was called, but geometrically this is a star grain.")
-                exit(1)
-                
-        def beta(self,y):
-            return np.arccos((self.Rp*np.sin(self.epsilonAngle))/(y+self.f))
+    def pressure(self,x,nozzle,propellant):
+        """ For CP grains, 'x' is time. For star grains, 'x' is burn distance."""
+        if self.graintype == "CP":
+            return (((self.burn_area(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/g0)**(1/(1-propellant.n))
+        else:
+            return (((self.burn_area(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/g0)**(1/(1-propellant.n))
+    
+    def __str__(self):
+        a = "Grain properties:\n"
+        if self.graintype == "shortspokewagonwheel" or self.graintype == "longspokewagonwheel" or self.graintype == "star":
+            a = a + f"Type: {self.graintype}\n"
+            a = a + f"Number of points, N: {self.N}\n"
+            a = a + f"Outer radius, Ro: {self.Ro}\n"
+            a = a + f"Inner radius, Ri: {self.Ri}\n"
+            a = a + f"Radius to curvature center, Rp: {self.Rp}\n"
+            a = a + f"Fillet radius, f: {self.f}\n"
+            a = a + f"Epsilon: {self.epsilon}\n"
+            a = a + f"Theta/2: {self.halfTheta} rad\n"
+            a = a + f"Length: {self.length}"
+        if self.graintype == "endburning":
+            a = a + f"Type: {self.graintype}\n"
+            a = a + f"Outer radius, Ro: {self.Ro}\n"
+            a = a + f"Length: {self.length}"
+        if self.graintype == "CP":
+            a = a + f"Type = {self.graintype}\n"
+            a = a + f"Outer radius, Ro = {self.Ro}\n"
+            a = a + f"Inner radius, Ri = {self.Ri}\n"
+            a = a + f"Length = {self.length}\n"
+        return a
+    
+class endburninggrain(grain):
+    """ End-burning grain """
+    def __init__(self,Ro,length):
+        self.Ro = Ro
+        self.length = length
+        self.graintype = "endburning"
+    
+    def burn_area(self, x):
+        return np.pi*self.Ro**2
+    
+    def port_area(self, x):
+        return 0
+
+class cpgrain(grain):
+    """ Circular-perforated grain """
+    def __init__(self,Ro,Ri,length):
+        self.Ro = Ro
+        self.Ri = Ri
+        self.length = length
+        self.graintype = "CP"
+    
+    def burn_area(self,t):
+        if self.n != 0.5:
+            return (self.K2*t + self.Abi**self.p)**self.q
+        elif self.n == 0.5:
+            return self.Abi * np.exp(self.K1*t)
+    
+    def port_area(self,y):
+        return np.pi*(self.Ri + y)**2
+
+class stargrain(grain):
+    """ Internal burning star grain """
+    def __init__(self,N,Ro,Ri,Rp,f,epsilon,halfTheta,length):
+        self.N = N
+        self.Ro = Ro
+        self.Ri = Ri
+        self.Rp = Rp
+        self.f = f
+        self.epsilon = epsilon
+        self.halfTheta = halfTheta
+        self.length = length
+        self.graintype = "star"
         
-        def phi(self,y):
-            return np.pi/2 + self.epsilonAngle - self.beta(y)
+        self.epsilonAngle = np.pi*self.epsilon/self.N
+        self.H1 = self.Rp*np.sin(self.epsilonAngle)
         
-        def burn_perimeter(self,y,S=None):
-            if self.phase(y) == 1:
-                H = self.Rp*np.sin(self.epsilonAngle)-y-self.f
-                x = ((y+self.f)/np.sin(self.halfTheta)) + (H/np.tan(self.halfTheta))
+        if self.Ri == None:
+            self.Ri = self.find_neutral_Ri()
+            
+        if self.halfTheta == None:
+            self.halfTheta = np.arctan((self.H1*np.tan(self.epsilonAngle))/(self.H1 - self.Ri*np.tan(self.epsilonAngle)))
+        
+        self.web1 = (self.Rp*np.sin(self.epsilonAngle)/np.cos(self.halfTheta))-self.f
+        
+        self.beta = np.pi/2 - self.halfTheta + self.epsilonAngle
+    
+        coeff = np.pi/2 - self.halfTheta + np.pi/self.N - 1/np.tan(self.halfTheta)
+        if coeff == 0:
+            self.neutrality = 0
+        elif coeff > 1:
+            self.neutrality = 1
+        else:
+            self.neutrality = -1
+    
+    def phase(self,y):
+        y0 = self.H1/np.cos(self.halfTheta)
+        if (y + self.f) < y0:
+            return 1
+        else:
+            return 2
+        
+    def gamma(self,y):
+        return np.arctan((np.sqrt((y+self.f)**2 - self.H1**2))/self.H1)-self.halfTheta
+    
+    def burn_perimeter(self,y,S=None):
+        if self.phase(y) == 1:
+            S1 = self.H1/np.sin(self.halfTheta) - (y+self.f)/np.tan(self.halfTheta)
+            S2 = (y+self.f)*self.beta
+            S3 = (self.Rp + y + self.f)*(np.pi/self.N - self.epsilonAngle)
+        elif self.phase(y) == 2:
+            S1 = 0
+            S2 = (y+self.f)*(self.beta-self.gamma(y))
+            S3 = (self.Rp+y+self.f)*(np.pi/self.N - self.epsilonAngle)
+        if S == None:
+            return 2*self.N*(S1+S2+S3)
+        elif S == 1:
+            return S1
+        elif S == 2:
+            return S2
+        elif S == 3:
+            return S3
+            
+    def burn_area(self, y):
+        burn_perimeter = self.burn_perimeter(y)
+        return burn_perimeter*self.length
+    
+    def port_area(self, y):
+        if self.phase(y) == 1:
+            S1 = self.burn_perimeter(y,1)
+            A1 = 0.5*self.H1*(self.Rp*np.cos(self.epsilonAngle)+self.H1*np.tan(self.halfTheta))-0.5*(S1**2)*np.tan(self.halfTheta)
+            A2 = 0.5*self.beta*(y+self.f)**2
+            A3 = 0.5*(np.pi/self.N - self.epsilonAngle)*(self.Rp+y+self.f)**2
+        elif self.phase(y) == 2:
+            A1 = 0.5*self.H1*(self.Rp*np.cos(self.epsilonAngle)+np.sqrt((y-self.f)**2 - self.H1**2))
+            A2 = 0.5*(self.beta - self.gamma(y))*(y+self.f)**2
+            A3 = 0.5*(np.pi/self.N - self.epsilonAngle)*(self.Rp + y + self.f)**2
+        return 2*self.N*(A1+A2+A3)
+    
+    def find_neutral_Ri(self):
+        def f(Ri):
+            return np.pi/2 + np.pi/self.N - np.arctan((self.H1*np.tan(self.epsilonAngle))/(self.H1 - Ri*np.tan(self.epsilonAngle))) - (self.H1 - Ri*np.tan(self.epsilonAngle))/(self.H1*np.tan(self.epsilonAngle))
+        return optimize.root_scalar(f, method='newton',x0=1).root
+
+class wagonwheelgrain(grain):
+    """ Short- or long-spoke wagon wheel grain """
+    def __init__(self,N,Ro,Ri,Rp,f,epsilon,halfTheta,length):
+        self.N = N
+        self.Ro = Ro
+        self.Ri = Ri
+        self.Rp = Rp
+        self.f = f
+        self.epsilon = epsilon
+        self.halfTheta = halfTheta
+        self.length = length
+        self.epsilonAngle = np.pi*self.epsilon/self.N
+        self.h = (self.Rp*np.cos(self.epsilonAngle)-((self.Rp*np.sin(self.epsilonAngle))/(np.tan(self.halfTheta)))-self.Ri)*np.sin(self.halfTheta)
+        self.graintype = "wagonwheel"
+            
+    def beta(self,y):
+        return np.arccos((self.Rp*np.sin(self.epsilonAngle))/(y+self.f))
+    
+    def phi(self,y):
+        return np.pi/2 + self.epsilonAngle - self.beta(y)
+    
+    def burn_perimeter(self,y,S=None):
+        if self.phase(y) == 1:
+            H = self.Rp*np.sin(self.epsilonAngle)-y-self.f
+            x = ((y+self.f)/np.sin(self.halfTheta)) + (H/np.tan(self.halfTheta))
+            S1 = (self.Rp + self.f + y)*(np.pi/self.N - self.epsilonAngle)
+            S2 = (y+self.f)*(np.pi/2 + self.epsilonAngle)
+            S3 = self.Rp*np.cos(self.epsilonAngle)-self.Ri-x
+            S4 = H/np.sin(self.halfTheta)
+        elif self.phase(y) == 2:
+            if self.graintype == "longspokewagonwheel":
+                S1 = (self.Rp+self.f+y)*(np.pi/self.N - self.epsilonAngle)
+                S2 = (y+self.f)*self.phi(y)
+                S3 = 0
+                S4 = 0
+            elif self.graintype == "shortspokewagonwheel":
+                alpha = np.arccos(1 - (self.h/(y+self.f)))
                 S1 = (self.Rp + self.f + y)*(np.pi/self.N - self.epsilonAngle)
-                S2 = (y+self.f)*(np.pi/2 + self.epsilonAngle)
-                S3 = self.Rp*np.cos(self.epsilonAngle)-self.Ri-x
-                S4 = H/np.sin(self.halfTheta)
-            elif self.phase(y) == 2:
-                if self.graintype == "longspokewagonwheel":
-                    S1 = (self.Rp+self.f+y)*(np.pi/self.N - self.epsilonAngle)
-                    S2 = (y+self.f)*self.phi(y)
-                    S3 = 0
-                    S4 = 0
-                elif self.graintype == "shortspokewagonwheel":
-                    alpha = np.arccos(1 - (self.h/(y+self.f)))
-                    S1 = (self.Rp + self.f + y)*(np.pi/self.N - self.epsilonAngle)
-                    S2 = (y+self.f)*(np.pi/2 + self.epsilonAngle - (self.halfTheta - alpha))
-                    S3 = 0
-                    S4 = (self.Rp*np.sin(self.epsilonAngle)-(y+self.f)*np.cos(self.halfTheta-alpha))/np.sin(self.halfTheta)
-            if S == None:
-                return 2*self.N*(S1+S2+S3+S4)
-            elif S == 1:
-                return S1
-            elif S == 2:
-                return S2
-            elif S == 3:
-                return S3
-            elif S == 4:
-                return S4
-            elif S == 'H':
-                return H
-        
-        def Ab(self, y):
-            burn_perimeter = self.burn_perimeter(y)
-            return burn_perimeter*self.length
-        
-        def Ap(self, y, S=None):
-            if self.phase(y) == 1:
-                H = self.burn_perimeter(y,'H')
-                S3 = self.burn_perimeter(y,3)
-                A1 = 0.5*(self.Rp + self.f + y)**2 * (np.pi/self.N - self.epsilonAngle)
-                A2 = 0.5*(np.pi/2 + self.epsilonAngle)*(self.f+y)**2
-                A3 = 0.5*self.Rp**2 * np.sin(self.epsilonAngle)*np.cos(self.epsilonAngle)
-                A4 = -(H*S3 + 0.5*(H**2/np.tan(self.halfTheta)))
-                A5 = 0
-            elif self.phase(y) == 2:
-                if self.graintype == "longspokewagonwheel":
-                    A1 = 0.5*(np.pi/self.N - self.epsilonAngle)*(self.Rp+self.f+y)**2
-                    A2 = 0.5*(np.pi/2 + self.epsilonAngle - self.beta(y))*(self.f+y)**2
-                    A3 = 0.5*self.Rp*np.sin(self.epsilonAngle)*(self.Rp*np.cos(self.epsilonAngle)+(y+self.f)*np.sin(self.beta(y)))
-                    A4 = 0
-                    A5 = 0
-                elif self.graintype == "shortspokewagonwheel":
-                    alpha = np.arccos(1 - (self.h/(y+self.f)))
-                    beta = self.halfTheta - alpha
-                    phi = np.pi/2 + self.epsilonAngle - beta
-                    A1 = 0.5*(np.pi/self.N - self.epsilonAngle)*(self.Rp+self.f+y)**2
-                    A2 = 0.5*phi*(self.f+y)**2
-                    A3 = 0.5*self.Rp**2 * np.sin(self.epsilonAngle) * np.cos(self.epsilonAngle)
-                    A4 = 0.5*np.cos(beta)*np.sin(beta)*(y+self.f)**2
-                    S4 = self.burn_perimeter(y,4)
-                    A5 = (self.Rp * np.sin(self.epsilonAngle) - (y+self.f)*np.cos(beta))*((y+self.f)*np.sin(beta))-0.5*S4**2 * np.sin(self.halfTheta)*np.cos(self.halfTheta)
-            if S == None:
-                return 2*self.N*(A1+A2+A3+A4+A5)
-            elif S == 1:
-                return A1
-            elif S == 2:
-                return A2
-            elif S == 3:
-                return A3
-            elif S == 4:
-                return A4
-            elif S == 5:
-                return A5
-            elif S == 'H':
-                return H
-        
-        def phase(self,y):
-            y0 = self.Rp*np.sin(self.epsilonAngle)
-            if (y + self.f) < y0:
-                return 1
-            else:
-                return 2
+                S2 = (y+self.f)*(np.pi/2 + self.epsilonAngle - (self.halfTheta - alpha))
+                S3 = 0
+                S4 = (self.Rp*np.sin(self.epsilonAngle)-(y+self.f)*np.cos(self.halfTheta-alpha))/np.sin(self.halfTheta)
+        if S == None:
+            return 2*self.N*(S1+S2+S3+S4)
+        elif S == 1:
+            return S1
+        elif S == 2:
+            return S2
+        elif S == 3:
+            return S3
+        elif S == 4:
+            return S4
+        elif S == 'H':
+            return H
     
-    class nozzle():
-        """ Rocket nozzle """
-        def __init__(self,throat_area=None,throat_diameter=None,exit_area=None,Me=None,P0=None,Pe=None,Pa=None,Te=None,expansion_ratio=None,specific_heat_ratio=None,ue=None):
-            self.throat_area = throat_area
-            if self.throat_area == None and throat_diameter != None:
-                self.throat_area = np.pi*(throat_diameter/2)**2
-                self.throat_diameter = throat_diameter
-            self.exit_area = exit_area
-            self.Me = Me
-            self.P0 = P0
-            self.Pe = Pe
-            self.Pa = Pa
-            self.Te = Te
-            self.expansion_ratio = expansion_ratio
-            self.specific_heat_ratio = specific_heat_ratio
-            self.ue = ue
+    def burn_area(self, y):
+        burn_perimeter = self.burn_perimeter(y)
+        return burn_perimeter*self.length
+    
+    def port_area(self, y, S=None):
+        if self.phase(y) == 1:
+            H = self.burn_perimeter(y,'H')
+            S3 = self.burn_perimeter(y,3)
+            A1 = 0.5*(self.Rp + self.f + y)**2 * (np.pi/self.N - self.epsilonAngle)
+            A2 = 0.5*(np.pi/2 + self.epsilonAngle)*(self.f+y)**2
+            A3 = 0.5*self.Rp**2 * np.sin(self.epsilonAngle)*np.cos(self.epsilonAngle)
+            A4 = -(H*S3 + 0.5*(H**2/np.tan(self.halfTheta)))
+            A5 = 0
+        elif self.phase(y) == 2:
+            if self.graintype == "longspokewagonwheel":
+                A1 = 0.5*(np.pi/self.N - self.epsilonAngle)*(self.Rp+self.f+y)**2
+                A2 = 0.5*(np.pi/2 + self.epsilonAngle - self.beta(y))*(self.f+y)**2
+                A3 = 0.5*self.Rp*np.sin(self.epsilonAngle)*(self.Rp*np.cos(self.epsilonAngle)+(y+self.f)*np.sin(self.beta(y)))
+                A4 = 0
+                A5 = 0
+            elif self.graintype == "shortspokewagonwheel":
+                alpha = np.arccos(1 - (self.h/(y+self.f)))
+                beta = self.halfTheta - alpha
+                phi = np.pi/2 + self.epsilonAngle - beta
+                A1 = 0.5*(np.pi/self.N - self.epsilonAngle)*(self.Rp+self.f+y)**2
+                A2 = 0.5*phi*(self.f+y)**2
+                A3 = 0.5*self.Rp**2 * np.sin(self.epsilonAngle) * np.cos(self.epsilonAngle)
+                A4 = 0.5*np.cos(beta)*np.sin(beta)*(y+self.f)**2
+                S4 = self.burn_perimeter(y,4)
+                A5 = (self.Rp * np.sin(self.epsilonAngle) - (y+self.f)*np.cos(beta))*((y+self.f)*np.sin(beta))-0.5*S4**2 * np.sin(self.halfTheta)*np.cos(self.halfTheta)
+        if S == None:
+            return 2*self.N*(A1+A2+A3+A4+A5)
+        elif S == 1:
+            return A1
+        elif S == 2:
+            return A2
+        elif S == 3:
+            return A3
+        elif S == 4:
+            return A4
+        elif S == 5:
+            return A5
+        elif S == 'H':
+            return H
+    
+    def phase(self,y):
+        y0 = self.Rp*np.sin(self.epsilonAngle)
+        if (y + self.f) < y0:
+            return 1
+        else:
+            return 2
+
+class tubulargrain(grain):
+    def __init__(self,Rc,Ro,Ri,length):
+        self.Rc = Rc
+        self.Ro = Ro # Ra in slides
+        self.Ri = Ri # Rb in slides
+        self.length = length
+        self.graintype = "tubular"
+        
+        def burn_area(self,y):
+            #return 2*np.pi*(self.Ro-self.Ri)*self.length
+            return 2*np.pi*(self.Ro - y)*self.length + 2*np.pi*(self.Ri + y)*self.length
+        
+        def port_area(self,y):
+            inner_disk = np.pi * (self.Ri + y)**2
+            outer_annulus = np.pi*self.Rc**2 - np.pi*(self.Ro - y)**2
+            return inner_disk + outer_annulus
