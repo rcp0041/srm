@@ -3,6 +3,35 @@
 
 from srm.srm import propellant
 
+rho_water = 0.03613 # lbm/in^3
+
+class metal:
+    def __init__(self,specific_gravity=None,density=None,yield_strength=None,name=None):
+        self.name = name
+        if specific_gravity != None:
+            self.specific_gravity = specific_gravity
+            self.density = specific_gravity*rho_water
+        elif density != None:
+            self.density = density
+            self.specific_gravity = density/rho_water
+        self.yield_strength = yield_strength
+    
+    def __str__(self):
+        a = "Metal properties:\n"
+        a = a + f"Name: {self.name}\n"
+        a = a + f"Density: {self.density} lbm/in^3\n"
+        a = a + f"Yield strength: {self.yield_strength} psi"
+        return a
+
+steel = {
+    # "common" : metal(name="Common steel",specific_gravity=7.84,yield_strength=40000),
+    "low alloy" : metal(specific_gravity=7.84,yield_strength=190000,name="Low alloy steel"),
+    "maraging" : metal(specific_gravity=7.84,yield_strength=270000,name="Maraging steel"),
+    # "Al alloy" : metal(specific_gravity=2.77,yield_strength=85000,name="Aluminum alloy steel"),
+    # "Ti alloy" : metal(specific_gravity=4.43,yield_strength=95000,name="Titanium alloy steel"),
+    # "Fiberglass-plastic" : metal(specific_gravity=1.75,yield_strength=65000,name="Fiberglass-plastic"),
+    }
+
 propellants = {
     "DB" : propellant(
         name="DB",
@@ -84,4 +113,4 @@ propellants = {
         cstar=3803,
         MW=21.8
     ),
-}
+    }
