@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from srm.srm import propellant
+from srm import propellant
 
 rho_water = 0.03613 # lbm/in^3
 
