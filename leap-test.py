@@ -72,13 +72,15 @@ def construct_motor(genome):
     halfTheta = genome[6]
     length = genome[7]
     propellant_index = int(genome[8])
+    material_index = int(genome[9])
     propellant = srm.materials.propellants[propellants_list[propellant_index]]
     grain = srm.stargrain(N,Ro,Ri,Rp,f,epsilon,halfTheta,length)
     nozzle = srm.nozzle(expansion_ratio=8,
                         ambient_pressure=14.7,
                         exit_pressure=14.7,
                         throat_diameter=2.0)
-    return srm.motor(propellant,grain,nozzle)
+    case = srm.case(material=srm.materials.steel[steel_list[material_index]],safety_factor=1.3,mass_fraction=0.85)
+    return srm.motor(propellant,grain,nozzle,case)
 
 def construct_case(genome):
     """ Constructs a case object from a given genome """
@@ -90,25 +92,35 @@ class fitness:
         pass
     
     def payload_mass(genome):
-        return payload_mass(construct_case(genome),construct_motor(genome))
+        return construct_motor(genome).payload_mass()
 
     def max_pressure(genome):
-        motor = construct_motor(genome)
-        return max_pressure(motor)
+        return construct_motor(genome).max_pressure()
     
     def avg_thrust(genome):
-        motor = construct_motor(genome)
-        return avg_thrust(motor)
+        return construct_motor(genome).avg_thrust()
     
     def max_thrust(genome):
-        motor = construct_motor(genome)
-        return max_thrust(motor)
+        return construct_motor(genome).max_thrust()
 
 def print_results(results):
     motor = construct_motor(results) # motor.propellant.name
-    case = construct_case(results) # case.material.name
-    M_payload = payload_mass(case,motor)
-    print("Payload mass: {} lbm\nCase material: {}\nPropellant: {}\n{}".format(M_payload,case.material.name,motor.propellant.name,motor.grain))
+    # M_payload = motor.payload_mass()
+    peak_pressure = motor.max_pressure()
+    def roundoff(x):
+        return round(x,3)
+    N = roundoff(motor.grain.N)
+    Ro = roundoff(motor.grain.Ro)
+    Ri = roundoff(motor.grain.Ri)
+    Rp = roundoff(motor.grain.Rp)
+    f = roundoff(motor.grain.f)
+    epsilon = roundoff(motor.grain.epsilon)
+    halfTheta = roundoff(motor.grain.halfTheta)
+    length = roundoff(motor.grain.length)
+    print(
+        # f"{motor.grain.graintype} & {N} & {Ro} & {Ri} & {Rp} & {f} & {epsilon} & {halfTheta} & {length} & {motor.propellant.name} & {motor.case.material.name} & {roundoff(M_payload)}"
+        f"{motor.grain.graintype} & {N} & {Ro} & {Ri} & {Rp} & {f} & {epsilon} & {halfTheta} & {length} & {motor.propellant.name} & {motor.case.material.name} & {roundoff(peak_pressure)}"
+        )
     
 def evolve(fitness_function,generations=50,pop_size=20,maximize=True):
     data = toml.load("./config.toml")
@@ -139,10 +151,16 @@ def evolve(fitness_function,generations=50,pop_size=20,maximize=True):
                        hard_bounds=True,
                        maximize=maximize)
     print_results(results)
-    return [construct_motor(results),construct_case(results)]
+    return construct_motor(results)
 
 """ Examples """
-evolve(fitness.payload_mass,50,20) # Evolve for maximum payload mass
+# motor = evolve(fitness.payload_mass,50,20) # Evolve for maximum payload mass
+motor = evolve(fitness.max_pressure,50,20,maximize=False)
+
+import srm.utilities as utilities
+data = utilities.data(motor)
+data.plot(['pressure'])
+
 # evolve(fitness.max_pressure,50,20,maximize=False) # Evolve for lowest max pressure
 # evolve(fitness.avg_thrust,50,20) # Evolve for maximum average thrust
 # evolve(fitness.max_thrust,50,20) # Evolve for maximum peak thrust

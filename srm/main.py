@@ -8,11 +8,9 @@ Created on Wed Mar 12 22:43:15 2025
 
 # TODO: Add bool phase1_neutral to star and WW grains
 # TODO: Implement grain type checking at grain rather than motor declaration
-# TODO: Implement table of common propellants
 # TODO: Implement neutral WW theta table (slide 4:71)
 # TODO: Implement slotted, spherical, tubular, and rod-in-tube grains
 # TODO: Have a "design_altitude" attribute for the nozzle that queries the standard atmosphere! (And allows to set exit and ambient pressure dynamically)
-
 
 import numpy as np                    # Numerical operations
 from scipy import optimize            # Root finder
@@ -40,9 +38,10 @@ class dummy_updater(object):
         self.__dict__.update(iterable, **kwargs)
 
 class motor:
-    def __init__(self,propellant,grain,nozzle):
+    def __init__(self,propellant,grain,nozzle,case=None):
         self.propellant = propellant
         self.nozzle = nozzle
+        self.case = case
 
         # Do star/wagon wheel check before assigning self.grain        
         if grain.graintype == "star" or grain.graintype == "wagonwheel":
@@ -168,6 +167,55 @@ class motor:
                 r = self.burn_rate(y)
                 Y = np.vstack((Y,np.array([t,y,self.pressure(y),self.thrust(y),self.specific_impulse(y)])))
         return Y
+    
+    def max_pressure(self,timestep=0.1):
+        """ Computes peak chamber pressure """
+        Y = self.burn_vector(timestep)
+        return max(Y[:,2])
+    
+    def avg_pressure(self,timestep=0.1):
+        """ Computes average chamber pressure """
+        Y = self.burn_vector(timestep)
+        return np.average(Y[:,2])
+
+    def max_thrust(self,timestep=0.1):
+        """ Computes peak thrust """
+        Y = self.burn_vector(timestep)
+        return max(Y[:,3])
+
+    def avg_thrust(self,timestep=0.1):
+        """ Computes average thrust """
+        Y = self.burn_vector(timestep)
+        return np.average(Y[:,3])
+    
+    def payload_mass(self):
+        """ Computes payload mass (M_inert - M_case) for a given rocket motor """
+        # Get case properties
+        SF = self.case.safety_factor
+        rho = self.case.density
+        sigma = self.case.yield_strength
+        MF = self.case.mass_fraction
+        
+        # Get motor properties
+        Rc = self.grain.Ro
+        L = self.grain.length
+        Pc = self.max_pressure()
+        Dt = self.nozzle.throat_diameter
+        
+        t = (SF*Rc*Pc)/sigma
+        M_cyl = 2*np.pi*Rc*t*L*rho
+        t_end = SF*(Rc*Pc)/(2*sigma)
+        M_nose = 2*np.pi*Rc**2 * t_end * rho
+        phi = np.arctan(Dt/(2*Rc))
+        M_aft = M_nose*np.cos(phi)
+        t_nozzle = SF*((Dt*Pc)/(2*sigma))
+        Rt = Dt/2
+        Re = Rt*np.sqrt(self.nozzle.expansion_ratio)
+        L_nozzle = (Re-Rt)/np.tan(phi)
+        M_nozzle = rho*((np.pi*L_nozzle)/3) * (((Re+t_nozzle)**2 + (Re+t_nozzle)*(Rt+t_nozzle) + (Rt+t_nozzle)**2)-(Re**2+Re*Rt+Rt**2))
+        M_inert = ((1/MF) - 1)*self.propellant_mass(0)
+        M_payload = M_inert - M_cyl - M_nose - M_aft - M_nozzle
+        return M_payload
     
     def __str__(self):
         a = self.propellant.__str__() + "\n"
