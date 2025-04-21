@@ -8,7 +8,9 @@ Created on Mon Apr  7 14:58:24 2025
 
 import numpy as np
 from matplotlib import pyplot as plt
-from srm import g0
+# from srm import g0
+
+g0 = 32.174
 
 class data():
     def __init__(self,motor,timestep=0.1):
@@ -34,6 +36,9 @@ class data():
     
     def plot(self, items: list):
     # TODO: Use a dictionary or something to streamline this plot decoration
+            if items[0] == 'all':
+                items = ['burn_distance','pressure','thrust','mass_flow_rate','impulse','specific_impulse','burn_area']
+                
             for item in items:
                 if item == 'burn_distance':
                     plot_title = "Burn Distance"
