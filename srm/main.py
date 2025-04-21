@@ -14,10 +14,12 @@ Created on Wed Mar 12 22:43:15 2025
 
 import numpy as np                    # Numerical operations
 from scipy import optimize            # Root finder
+from srm.utilities import data
 
 # Global variables:
 Ru = 1545
 g0 = 32.174
+default_timestep = 0.01
 
 def create_dict(obj):
     keys = [x for x in dir(obj) if not (x.startswith('__') or x.startswith('propellant'))]
@@ -51,8 +53,9 @@ class motor:
                 (grain.Ri + (grain.f/np.sin(grain.halfTheta)) + (grain.Rp*np.sin(grain.epsilonAngle)-grain.f)/np.tan(grain.halfTheta))
                 )
             if grain.delta >= np.pi/grain.N:
-                print("Maximum spoke length exceeded. Recheck your design parameters!")
-                exit(1)
+                # print("Maximum spoke length exceeded. Recheck your design parameters!")
+                grain.spoke_collision = True
+                # exit(1)
             # Detect star (h < 0) or wagon wheel (h > 0)
             grain.h = (grain.Rp*np.cos(grain.epsilonAngle)-((grain.Rp*np.sin(grain.epsilonAngle)/(np.tan(grain.halfTheta))))-grain.Ri)*np.sin(grain.halfTheta)
             if grain.h > 0:
@@ -68,8 +71,9 @@ class motor:
                 if grain.graintype == "wagonwheel" and (actualgraintype == "shortspokewagonwheel" or actualgraintype == "longspokewagonwheel"):
                     pass
                 else:
-                    print("You defined it as a {}, but this grain is a {}.".format(grain.graintype,actualgraintype))
-                    print("Reinitializing the grain as a {}.".format(actualgraintype))
+                    # print("You defined it as a {}, but this grain is a {}.".format(grain.graintype,actualgraintype))
+                    # print("Reinitializing the grain as a {}.".format(actualgraintype))
+                    pass
                 if actualgraintype == "star":
                     newgrain = stargrain(grain.N,grain.Ro,grain.Ri,grain.Rp,grain.f,grain.epsilon,grain.halfTheta,grain.length)
                 elif actualgraintype == "longspokewagonwheel" or actualgraintype == "shortspokewagonwheel":
@@ -84,7 +88,7 @@ class motor:
         if self.grain.graintype == "endburning":
             if hasattr(self.nozzle,'throat_area') and not hasattr(self.nozzle,'chamber_pressure'):
                 self.nozzle.chamber_pressure = self.pressure(0)
-                self.nozzle.recalculate()
+                self.nozzle.__recalculate__()
             self.grain.burn_rate = self.propellant.a * self.nozzle.chamber_pressure ** self.propellant.n
             self.grain.burn_time = self.grain.length / self.grain.burn_rate
         if self.grain.graintype == "CP":
@@ -168,22 +172,22 @@ class motor:
                 Y = np.vstack((Y,np.array([t,y,self.pressure(y),self.thrust(y),self.specific_impulse(y)])))
         return Y
     
-    def max_pressure(self,timestep=0.1):
+    def max_pressure(self,timestep=default_timestep):
         """ Computes peak chamber pressure """
         Y = self.burn_vector(timestep)
         return max(Y[:,2])
     
-    def avg_pressure(self,timestep=0.1):
+    def avg_pressure(self,timestep=default_timestep):
         """ Computes average chamber pressure """
         Y = self.burn_vector(timestep)
         return np.average(Y[:,2])
 
-    def max_thrust(self,timestep=0.1):
+    def max_thrust(self,timestep=default_timestep):
         """ Computes peak thrust """
         Y = self.burn_vector(timestep)
         return max(Y[:,3])
 
-    def avg_thrust(self,timestep=0.1):
+    def avg_thrust(self,timestep=default_timestep):
         """ Computes average thrust """
         Y = self.burn_vector(timestep)
         return np.average(Y[:,3])
@@ -216,6 +220,10 @@ class motor:
         M_inert = ((1/MF) - 1)*self.propellant_mass(0)
         M_payload = M_inert - M_cyl - M_nose - M_aft - M_nozzle
         return M_payload
+    
+    def plot(self, items: list):
+        motordata = data(self)
+        motordata.plot(items)
     
     def __str__(self):
         a = self.propellant.__str__() + "\n"
@@ -345,7 +353,8 @@ class grain():
             a = a + f"Fillet radius, f: {self.f}\n"
             a = a + f"Epsilon: {self.epsilon}\n"
             a = a + f"Theta/2: {self.halfTheta} rad\n"
-            a = a + f"Length: {self.length}"
+            a = a + f"Length: {self.length}\n"
+            a = a + f"Phase I burning: {self.neutrality} (neutrality coefficient: {self.neutrality_coefficient})\n"
         if self.graintype == "endburning":
             a = a + f"Type: {self.graintype}\n"
             a = a + f"Outer radius, Ro: {self.Ro}\n"
@@ -399,6 +408,7 @@ class stargrain(grain):
         self.halfTheta = halfTheta
         self.length = length
         self.graintype = "star"
+        self.spoke_collision = False
         
         self.epsilonAngle = np.pi*self.epsilon/self.N
         self.H1 = self.Rp*np.sin(self.epsilonAngle)
@@ -413,13 +423,14 @@ class stargrain(grain):
         
         self.beta = np.pi/2 - self.halfTheta + self.epsilonAngle
     
-        coeff = np.pi/2 - self.halfTheta + np.pi/self.N - 1/np.tan(self.halfTheta)
-        if coeff == 0:
-            self.neutrality = 0
-        elif coeff > 1:
-            self.neutrality = 1
+        self.neutrality_coefficient = np.pi/2 - self.halfTheta + np.pi/self.N - 1/np.tan(self.halfTheta)
+        if self.neutrality_coefficient < 0:
+            self.neutrality = 'Regressive'
+        # elif self.neutrality_coefficient >= 1e-17:
+        elif self.neutrality_coefficient == 0:
+            self.neutrality = 'Neutral'
         else:
-            self.neutrality = -1
+            self.neutrality = 'Progressive'
     
     def phase(self,y):
         y0 = self.H1/np.cos(self.halfTheta)
@@ -484,6 +495,16 @@ class wagonwheelgrain(grain):
         self.epsilonAngle = np.pi*self.epsilon/self.N
         self.h = (self.Rp*np.cos(self.epsilonAngle)-((self.Rp*np.sin(self.epsilonAngle))/(np.tan(self.halfTheta)))-self.Ri)*np.sin(self.halfTheta)
         self.graintype = "wagonwheel"
+        self.spoke_collision = False
+        
+        self.neutrality_coefficient = np.pi/self.N + np.pi/2 - (2/np.sin(self.halfTheta)) + 1/np.tan(self.halfTheta)
+        if self.neutrality_coefficient < 0:
+            self.neutrality = 'Regressive'
+        # elif self.neutrality_coefficient >= 1e-17:
+        elif self.neutrality_coefficient == 0:
+            self.neutrality = 'Neutral'
+        else:
+            self.neutrality = 'Progressive'
             
     def beta(self,y):
         return np.arccos((self.Rp*np.sin(self.epsilonAngle))/(y+self.f))
