@@ -6,6 +6,7 @@ Created on Mon Apr  7 11:00:51 2025
 @author: ray
 """
 
-# Expose srm stuff for easier use
+# Just expose srm stuff for easier use
 from .main import *
 from .materials import *
+from .utilities import *
