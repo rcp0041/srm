@@ -212,8 +212,10 @@ class motor:
         Dt = self.nozzle.throat_diameter
         
         t = (SF*Rc*Pc)/sigma
+        self.case.wall_thickness = t
         M_cyl = 2*np.pi*Rc*t*L*rho
         t_end = SF*(Rc*Pc)/(2*sigma)
+        self.case.end_thickness = t_end
         M_nose = 2*np.pi*Rc**2 * t_end * rho
         phi = np.arctan(Dt/(2*Rc))
         M_aft = M_nose*np.cos(phi)
@@ -294,7 +296,11 @@ class case:
         a = a + f"Density: {self.density} lbm/in^3\n"
         a = a + f"Yield strength: {self.yield_strength} psi\n"
         a = a + f"Safety factor: {self.safety_factor}\n"
-        a = a + f"Mass fraction: {self.mass_fraction}"
+        a = a + f"Mass fraction: {self.mass_fraction}\n"
+        if hasattr(self,'wall_thickness'):
+            a = a + f"Wall thickness: {self.wall_thickness} in\n"
+        if hasattr(self,'end_thickness'):
+            a = a + f"End thickness: {self.end_thickness} in\n"
         return a
 
 class propellant:
