@@ -186,6 +186,11 @@ class motor:
         """ Computes peak thrust """
         Y = self.burn_vector(timestep)
         return max(Y[:,3])
+    
+    def min_thrust(self,timestep=default_timestep):
+        """ Computes minimum thrust """
+        Y = self.burn_vector(timestep)
+        return min(Y[:,3])
 
     def avg_thrust(self,timestep=default_timestep):
         """ Computes average thrust """
