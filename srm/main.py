@@ -245,6 +245,12 @@ class nozzle(dummy_updater):
     def __init__(self, iterable=(), **kwargs):
         super().__init__(iterable, **kwargs)
         
+        # Compute expansion ratio if possible
+        if hasattr(self, 'exit_diameter') and hasattr(self, 'throat_diameter') and not hasattr(self,'expansion_ratio'):
+            self.exit_area = (np.pi/4)*self.exit_diameter**2
+            self.throat_area = (np.pi/4)*self.throat_diameter**2
+            self.expansion_ratio = self.exit_area/self.throat_area
+        
         # Compute pressure ratio if possible
         if hasattr(self,'exit_pressure') and hasattr(self,'chamber_pressure'):
             self.pressure_ratio = self.exit_pressure/self.chamber_pressure
