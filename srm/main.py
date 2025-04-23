@@ -108,6 +108,7 @@ class motor:
         """ Nozzle stuff """
         if hasattr(self.propellant,'specific_heat_ratio'):
             self.nozzle.k = self.propellant.specific_heat_ratio
+            self.nozzle.__recalculate__()
         
         if hasattr(self.propellant,'temperature'):
             self.nozzle.__recalculate__(chamber_temperature=self.propellant.temperature)
