@@ -181,27 +181,53 @@ class motor:
     def max_pressure(self,timestep=default_timestep):
         """ Computes peak chamber pressure """
         Y = self.burn_vector(timestep)
-        return max(Y[:,2])
+        """ Test for IndexError and print diagnostic """
+        if Y.ndim == 1:
+            # print("Burn vector is 1D! I wonder why?")
+            # print(self)
+            return 0
+        else:
+            return max(Y[:,2])
     
     def avg_pressure(self,timestep=default_timestep):
         """ Computes average chamber pressure """
         Y = self.burn_vector(timestep)
-        return np.average(Y[:,2])
+        if Y.ndim == 1:
+            # print("Burn vector is 1D! I wonder why?")
+            # print(self)
+            return 0
+        else:
+            return np.average(Y[:,2])
 
     def max_thrust(self,timestep=default_timestep):
         """ Computes peak thrust """
         Y = self.burn_vector(timestep)
-        return max(Y[:,3])
+        if Y.ndim == 1:
+            # print("Burn vector is 1D! I wonder why?")
+            # print(self)
+            return 0
+        else:
+            return max(Y[:,3])
     
     def min_thrust(self,timestep=default_timestep):
         """ Computes minimum thrust """
         Y = self.burn_vector(timestep)
-        return min(Y[:,3])
+        if Y.ndim == 1:
+            # print("Burn vector is 1D! I wonder why?")
+            # print(self)
+            return 0
+        else:
+            return min(Y[:,3])
 
     def avg_thrust(self,timestep=default_timestep):
         """ Computes average thrust """
         Y = self.burn_vector(timestep)
-        return np.average(Y[:,3])
+        if Y.ndim == 1:
+            # print("Burn vector is 1D! I wonder why?")
+            # print(self)
+            return 0
+        else:
+            return np.average(Y[:,3])
     
     def payload_mass(self):
         """ Computes payload mass (M_inert - M_case) for a given rocket motor """
