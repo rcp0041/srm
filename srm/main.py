@@ -43,7 +43,7 @@ class motor:
     def __init__(self,propellant,grain,nozzle,case=None):
         self.propellant = propellant
         self.nozzle = nozzle
-        self.case = case
+        # self.case = case
 
         # Do star/wagon wheel check before assigning self.grain        
         if grain.graintype == "star" or grain.graintype == "wagonwheel":
@@ -104,6 +104,10 @@ class motor:
                 self.grain.burn_time = (self.grain.Abf**((2*self.propellant.n-1)/(self.propellant.n-1)) - self.grain.Abi**((2*self.propellant.n-1)/(self.propellant.n-1)))/self.grain.K2
             elif self.propellant.n == 0.5:
                 self.grain.burn_time = np.log(self.grain.Abf)/(np.log(self.grain.Abi)*self.grain.K1)
+        
+        """ Case stuff """
+        case.wall_radius = self.grain.Ro
+        self.case = case
         
         """ Nozzle stuff """
         if hasattr(self.propellant,'specific_heat_ratio'):
@@ -297,7 +301,10 @@ class case:
         self.yield_strength = self.material.yield_strength
         self.safety_factor = safety_factor
         self.mass_fraction = mass_fraction
-    
+
+    def yield_pressure(self):
+        return self.yield_strength*(self.wall_thickness/self.wall_radius)
+
     def __str__(self):
         a = "Case properties:\n"
         if hasattr(self.material,'name'):
