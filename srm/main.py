@@ -257,7 +257,11 @@ class motor:
         L_nozzle = (Re-Rt)/np.tan(phi)
         M_nozzle = rho*((np.pi*L_nozzle)/3) * (((Re+t_nozzle)**2 + (Re+t_nozzle)*(Rt+t_nozzle) + (Rt+t_nozzle)**2)-(Re**2+Re*Rt+Rt**2))
         M_inert = ((1/MF) - 1)*self.propellant_mass(0)
-        M_payload = M_inert - M_cyl - M_nose - M_aft - M_nozzle
+        M_case = M_cyl + M_nose + M_aft + M_nozzle
+        # M_payload = M_inert - M_cyl - M_nose - M_aft - M_nozzle
+        M_payload = M_inert - M_case
+        self.dry_mass = M_inert + M_case
+        self.case.mass = M_case
         return M_payload
     
     def plot(self, items: list):
