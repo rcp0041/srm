@@ -119,6 +119,7 @@ class motor:
             self.nozzle.__recalculate__()
             
         if hasattr(self.nozzle,'exit_temperature') and hasattr(self.nozzle,'chamber_temperature') and hasattr(self.propellant,'R'):
+            print(f"gamma = {self.propellant.specific_heat_ratio}, sqrt(2/gamma-1) = sqrt(2/{self.propellant.specific_heat_ratio-1})")
             self.nozzle.exit_velocity = np.sqrt(2 * (self.propellant.specific_heat_ratio)/(self.propellant.specific_heat_ratio-1) * self.propellant.R * g0 * (self.nozzle.chamber_temperature - self.nozzle.exit_temperature))
             self.nozzle.__recalculate__()
         
@@ -271,6 +272,7 @@ class nozzle(dummy_updater):
         
         # Compute exit Mach number if possible
         if hasattr(self,'k') and hasattr(self,'pressure_ratio'):
+            print(f"k = {self.k}, sqrt(2/k-1) = sqrt(2/{self.k-1})")
             self.exit_mach = np.sqrt((2/(self.k-1)) * (((1/self.pressure_ratio) ** ((self.k-1)/self.k))-1))
         
         # Compute exit area if possible
