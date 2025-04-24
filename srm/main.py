@@ -106,8 +106,9 @@ class motor:
                 self.grain.burn_time = np.log(self.grain.Abf)/(np.log(self.grain.Abi)*self.grain.K1)
         
         """ Case stuff """
-        case.wall_radius = self.grain.Ro
-        self.case = case
+        if case != None:
+            case.wall_radius = self.grain.Ro
+            self.case = case
         
         """ Nozzle stuff """
         if hasattr(self.propellant,'specific_heat_ratio'):
