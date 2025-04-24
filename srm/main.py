@@ -156,7 +156,10 @@ class motor:
         return self.thrust(x)/(self.mass_flow_rate(x)*g0)
     
     def burn_vector(self,timestep,initial_time=0):
-        """ Returns a state vector """
+        """
+        Returns a state vector of the form:
+        [t, y, pressure, thrust, specific_impulse]
+        """
         Y = np.array([initial_time,0,self.pressure(0),self.thrust(0),self.specific_impulse(0)])
         t,y,r = initial_time,0,self.burn_rate(0)
         if self.grain.graintype == "CP":
