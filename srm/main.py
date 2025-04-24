@@ -268,6 +268,10 @@ class motor:
         self.case.mass = M_case
         return M_payload
     
+    def dry_mass(self):
+        self.payload_mass()
+        return self.dry_mass
+    
     def plot(self, items: list):
         motordata = data(self)
         motordata.plot(items)
