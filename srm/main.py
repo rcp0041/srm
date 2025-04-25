@@ -451,6 +451,7 @@ class cpgrain(grain):
         self.Ri = Ri
         self.length = length
         self.graintype = "CP"
+        self.yf = self.Ro - self.Ri
     
     def burn_area(self,t):
         if self.n != 0.5:
@@ -485,6 +486,7 @@ class stargrain(grain):
             self.halfTheta = np.arctan((self.H1*np.tan(self.epsilonAngle))/(self.H1 - self.Ri*np.tan(self.epsilonAngle)))
         
         self.web1 = (self.Rp*np.sin(self.epsilonAngle)/np.cos(self.halfTheta))-self.f
+        self.yf = self.Ro - self.Rp - self.f
         
         self.beta = np.pi/2 - self.halfTheta + self.epsilonAngle
     
@@ -561,6 +563,7 @@ class wagonwheelgrain(grain):
         self.h = (self.Rp*np.cos(self.epsilonAngle)-((self.Rp*np.sin(self.epsilonAngle))/(np.tan(self.halfTheta)))-self.Ri)*np.sin(self.halfTheta)
         self.graintype = "wagonwheel"
         self.spoke_collision = False
+        self.yf = self.Ro - self.Rp - self.f
         
         self.neutrality_coefficient = np.pi/self.N + np.pi/2 - (2/np.sin(self.halfTheta)) + 1/np.tan(self.halfTheta)
         if self.neutrality_coefficient < 0:
