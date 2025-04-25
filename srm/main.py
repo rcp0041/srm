@@ -159,7 +159,7 @@ class motor:
     def burn_vector(self,timestep,initial_time=0):
         """
         Returns a state vector of the form:
-        [t, y, pressure, thrust, specific_impulse]
+        [time, burn_distance, pressure, thrust, specific_impulse]
         """
         Y = np.array([initial_time,0,self.pressure(0),self.thrust(0),self.specific_impulse(0)])
         t,y,r = initial_time,0,self.burn_rate(0)
@@ -268,7 +268,7 @@ class motor:
         self.case.mass = M_case
         return M_payload
     
-    def dry_mass(self):
+    def empty_mass(self):
         self.payload_mass()
         return self.dry_mass
     
