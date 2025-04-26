@@ -453,11 +453,16 @@ class cpgrain(grain):
         self.graintype = "CP"
         self.yf = self.Ro - self.Ri
     
-    def burn_area(self,t):
-        if self.n != 0.5:
-            return (self.K2*t + self.Abi**self.p)**self.q
-        elif self.n == 0.5:
-            return self.Abi * np.exp(self.K1*t)
+    # This is the only one that depends on time. It will be simpler for all
+    # to depend on burn distance.
+    # def burn_area(self,t):
+    #     if self.n != 0.5:
+    #         return (self.K2*t + self.Abi**self.p)**self.q
+    #     elif self.n == 0.5:
+    #         return self.Abi * np.exp(self.K1*t)
+    
+    def burn_area(self,y):
+        return 2*self.length*np.pi*(self.Ri+y)**2
     
     def port_area(self,y):
         return np.pi*(self.Ri + y)**2
