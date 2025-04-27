@@ -39,6 +39,8 @@ class Tapered(SegmentedGrain):
         # def __init__(self,Ro: float,Ri: tuple,length: float):
         def __init__(self,Ro:float,Ri:float,Ri_scale_factor:float,length:float):
             # assert len(Ri) == 2, "Ri must have dimension 2."
+            assert Ri*Ri_scale_factor > 0, "Requested scale factor is physically impossible."
+            assert Ri*Ri_scale_factor <= Ro, "Requested scale factor is physically impossible."
             self.Ro = Ro
             self.length = length
             # self.Ri_start = Ri[0]
@@ -78,23 +80,3 @@ class Tapered(SegmentedGrain):
             a = a + f"length = {self.length}\n"
             a = a + f"delta_length = {self.delta_length}"
             return a
-            
-Ro = 6
-Ri = 5
-L = 12
-Ro = 6
-Ri = 5
-L = 12
-foo = Tapered.CP(Ro,Ri,0.5,L)
-
-motor = srm.motor(
-    propellant=srm.materials.propellants['PBAN_AP_AL'],
-    grain=foo,
-    nozzle=srm.nozzle(
-        exit_pressure = 14.7,
-        ambient_pressure = 14.7,
-        exit_diameter = foo.Ro,
-        expansion_ratio = 8
-        )
-    )
-
