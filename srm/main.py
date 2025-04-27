@@ -173,7 +173,9 @@ class motor:
                 Y = np.vstack((Y,np.array([t,y,self.pressure(t),self.thrust(t),self.specific_impulse(t)])))    
         elif self.grain.graintype != "CP":
             if self.grain.graintype == "endburning":
-                yf = self.grain.Ro
+                yf = self.grain.length
+            elif self.grain.graintype == 'tapered_CP':
+                yf = self.Ro - self.Ri
             else:
                 yf = self.grain.Ro - self.grain.Rp - self.grain.f
             while y < yf:
