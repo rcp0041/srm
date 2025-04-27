@@ -462,7 +462,7 @@ class cpgrain(grain):
     #         return self.Abi * np.exp(self.K1*t)
     
     def burn_area(self,y):
-        return self.length * (2*np.pi*self.Ri)
+        return self.length * (2*np.pi*(self.Ri+y))
     
     def port_area(self,y):
         return np.pi*(self.Ri + y)**2
