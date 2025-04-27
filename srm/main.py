@@ -310,7 +310,7 @@ class nozzle(dummy_updater):
             elif hasattr(self,'exit_diameter') and hasattr(self,'expansion_ratio'):
                 self.exit_area = np.pi/4 * self.exit_diameter**2
                 self.throat_area = self.exit_area/self.expansion_ratio
-                self.throat.diameter = np.sqrt(4*self.throat_area/np.pi)
+                self.throat_diameter = np.sqrt(4*self.throat_area/np.pi)
           
         # Compute exit temperature if possible
         if hasattr(self,'chamber_temperature') and hasattr(self,'pressure_ratio') and hasattr(self,'k'):
