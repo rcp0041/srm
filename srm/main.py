@@ -307,6 +307,10 @@ class nozzle(dummy_updater):
                 self.thrust_coefficient = self.propellant.cap_gamma *np.sqrt(((2*self.propellant.specific_heat_ratio)/(self.propellant.specific_heat_ratio-1))*(1-(self.exit_pressure/self.chamber_pressure)**((self.propellant.specific_heat_ratio-1)/self.propellant.specific_heat_ratio)))
                 self.throat_area = self.thrust/(self.chamber_pressure * self.thrust_coefficient)
                 self.throat_diameter = np.sqrt((4*self.throat_area)/np.pi)
+            elif hasattr(self,'exit_diameter') and hasattr(self,'expansion_ratio'):
+                self.exit_area = np.pi/4 * self.exit_diameter**2
+                self.throat_area = self.exit_area/self.expansion_ratio
+                self.throat.diameter = np.sqrt(4*self.throat_area/np.pi)
           
         # Compute exit temperature if possible
         if hasattr(self,'chamber_temperature') and hasattr(self,'pressure_ratio') and hasattr(self,'k'):
