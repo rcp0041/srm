@@ -30,6 +30,9 @@ class SegmentedGrain():
     
     def pressure(self,x,nozzle,propellant):
         return (((self.burn_area(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/srm.g0)**(1/(1-propellant.n))
+    
+    def propellant_volume(self,x):
+        return self.sum_segments('propellant_volume',x)
 
 class Tapered(SegmentedGrain):
     class CP(SegmentedGrain):
