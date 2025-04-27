@@ -7,7 +7,7 @@ Created on Sat Apr 26 13:04:02 2025
 """
 
 import numpy as np
-from srm import cpgrain, stargrain
+import srm
 
 NUM_SEGMENTS = 1000
 
@@ -27,6 +27,9 @@ class SegmentedGrain():
     
     def burn_area(self,x):
         return self.sum_segments('burn_area',x)
+    
+    def pressure(self,x,nozzle,propellant):
+        return (((self.burn_area(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/srm.g0)**(1/(1-propellant.n))
 
 class Tapered(SegmentedGrain):
     class CP(SegmentedGrain):
@@ -41,6 +44,7 @@ class Tapered(SegmentedGrain):
             self.Ri_end = self.Ri_start*Ri_scale_factor
             self.delta_Ri = (self.Ri_end - self.Ri_start)/NUM_SEGMENTS
             self.delta_length = self.length/NUM_SEGMENTS
+            self.graintype = 'CP'
             
             segments = []
             for i in range(0,NUM_SEGMENTS):
@@ -52,7 +56,7 @@ class Tapered(SegmentedGrain):
                     Ro = self.Ro
                     Ri = segments[i-1].Ri + self.delta_Ri
                     L = self.delta_length
-                segments.append(cpgrain(Ro,Ri,L))
+                segments.append(srm.cpgrain(Ro,Ri,L))
             
             self.segments = segments
         
@@ -69,47 +73,20 @@ class Tapered(SegmentedGrain):
 Ro = 6
 Ri = 5
 L = 12
+Ro = 6
+Ri = 5
+L = 12
+foo = Tapered.CP(Ro,Ri,0.5,L)
+foo.graintype = 'tapered_CP'
 
-test_grain = cpgrain(Ro,Ri,L)
+motor = srm.motor(
+    propellant=srm.materials.propellants['PBAN_AP_AL'],
+    grain=foo,
+    nozzle=srm.nozzle(
+        exit_pressure = 14.7,
+        ambient_pressure = 14.7,
+        exit_diameter = foo.Ro,
+        expansion_ratio = 8
+        )
+    )
 
-segments = []
-for i in range(0,NUM_SEGMENTS):
-    segments.append(cpgrain(Ro,Ri,L/NUM_SEGMENTS))
-
-def segs_Ab(segments):
-    Ab = 0
-    for segment in segments:
-        Ab = Ab + segment.burn_area(0)
-    return Ab
-
-def cone_SA(r,h):
-    return np.pi*r*np.sqrt(r**2 + h**2)
-
-def exact_taperCP(taperedcp):
-    R1 = taperedcp.Ri_start
-    R2 = taperedcp.Ri_end
-    L = taperedcp.length
-    C1 = 2*np.pi*R1
-    C2 = 2*np.pi*R2
-    return 0.5*(C1+C2)*L
-    
-# foo = Tapered.CP(Ro,(Ri,Ri),L)
-foo = Tapered.CP(Ro,Ri,1.3,L)
-
-# See if grain is neutral
-for x in np.arange(0,3,0.5):
-    print(foo.burn_area(x))
-
-# """
-# Setting Ri = Rp, f = 0, epsilon = 1e-6, and programmatically determining
-# halfTheta from H1 and epsilonAngle very closely approximates a CP grain.
-# """
-# N=3
-# epsilon=1e-6
-# pinAngle = np.pi/N
-# epsilonAngle = np.pi*epsilon/N
-# # epsilonAngle = pinAngle
-# tanEpsilon = np.tan(epsilonAngle)
-# H1 = Ri*np.sin(np.pi*epsilon/N)
-# halfTheta = np.arctan((H1*tanEpsilon)/(H1-Ri*tanEpsilon))
-# bar = stargrain(N=N,Ro=Ro,Ri=Ri,Rp=Ri,f=0,epsilon=epsilon,halfTheta=np.deg2rad(60),length=L)
