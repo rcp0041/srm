@@ -47,7 +47,7 @@ class Tapered(SegmentedGrain):
             self.Ri_end = self.Ri_start*Ri_scale_factor
             self.delta_Ri = (self.Ri_end - self.Ri_start)/NUM_SEGMENTS
             self.delta_length = self.length/NUM_SEGMENTS
-            self.graintype = 'CP'
+            self.graintype = 'tapered_CP'
             
             segments = []
             for i in range(0,NUM_SEGMENTS):
@@ -62,6 +62,12 @@ class Tapered(SegmentedGrain):
                 segments.append(srm.cpgrain(Ro,Ri,L))
             
             self.segments = segments
+        
+        def max_yf(self):
+            yf = []
+            for segment in self.segments:
+                yf.append(segment.yf)
+            return max(yf)
         
         def __str__(self):
             a = "Tapered CP grain:\n"
@@ -80,7 +86,6 @@ Ro = 6
 Ri = 5
 L = 12
 foo = Tapered.CP(Ro,Ri,0.5,L)
-foo.graintype = 'tapered_CP'
 
 motor = srm.motor(
     propellant=srm.materials.propellants['PBAN_AP_AL'],
