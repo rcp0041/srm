@@ -320,6 +320,8 @@ class nozzle(dummy_updater):
         # Compute exit area if possible
         if hasattr(self,'throat_area') and hasattr(self,'exit_mach') and hasattr(self,'k'):
             self.exit_area = (self.throat_area/self.exit_mach)*((2/(self.k+1))*(1+(0.5*(self.k-1))*self.exit_mach**2))**((self.k+1)/(2*(self.k-1)))
+        elif hasattr(self,'exit_diameter'):
+            self.exit_area = np.pi/4 * self.exit_diameter**2
             
     def __str__(self):
         a = "Nozzle properties:\n"
