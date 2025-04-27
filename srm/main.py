@@ -138,7 +138,8 @@ class motor:
     
     def propellant_mass(self,x):
         """ 'x' is burn distance for all grain types """
-        return ((np.pi*self.grain.Ro**2) - self.grain.port_area(x))*self.grain.length*self.propellant.density
+        # return ((np.pi*self.grain.Ro**2) - self.grain.port_area(x))*self.grain.length*self.propellant.density
+        return self.grain.propellant_volume(x) * self.propellant.density
     
     def burn_rate(self,x):
         """ For star grains, 'x' is burn distance """
@@ -412,6 +413,9 @@ class grain():
             return (((self.burn_area(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/g0)**(1/(1-propellant.n))
         else:
             return (((self.burn_area(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/g0)**(1/(1-propellant.n))
+    
+    def propellant_volume(self,x):
+        return (np.pi*self.Ro**2 - self.port_area(x)) * self.length
     
     def __str__(self):
         a = "Grain properties:\n"
