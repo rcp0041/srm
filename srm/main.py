@@ -175,7 +175,7 @@ class motor:
             if self.grain.graintype == "endburning":
                 yf = self.grain.length
             elif self.grain.graintype == 'tapered_CP':
-                yf = self.grain.Ro - self.grain.Ri
+                yf = self.grain.max_yf()
             else:
                 yf = self.grain.Ro - self.grain.Rp - self.grain.f
             while y < yf:
