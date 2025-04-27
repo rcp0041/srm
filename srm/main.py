@@ -462,7 +462,10 @@ class cpgrain(grain):
     #         return self.Abi * np.exp(self.K1*t)
     
     def burn_area(self,y):
-        return self.length * (2*np.pi*(self.Ri+y))
+        if y >= self.yf:
+            return 0
+        else:
+            return self.length * (2*np.pi*(self.Ri+y))
     
     def port_area(self,y):
         return np.pi*(self.Ri + y)**2
@@ -534,7 +537,10 @@ class stargrain(grain):
             
     def burn_area(self, y):
         burn_perimeter = self.burn_perimeter(y)
-        return burn_perimeter*self.length
+        if y >= self.yf:
+            return 0
+        else:
+            return burn_perimeter*self.length
     
     def port_area(self, y):
         if self.phase(y) == 1:
@@ -620,7 +626,10 @@ class wagonwheelgrain(grain):
     
     def burn_area(self, y):
         burn_perimeter = self.burn_perimeter(y)
-        return burn_perimeter*self.length
+        if y >= self.yf:
+            return 0
+        else:
+            return burn_perimeter*self.length
     
     def port_area(self, y, S=None):
         if self.phase(y) == 1:
