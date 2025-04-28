@@ -9,7 +9,7 @@ Created on Sat Apr 26 13:04:02 2025
 import numpy as np
 import srm
 
-NUM_SEGMENTS = 1000
+NUM_SEGMENTS = 3
 
 class SegmentedGrain():
     """ Multiple grain segments composed together into a single grain """
