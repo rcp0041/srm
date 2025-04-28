@@ -69,12 +69,12 @@ class Tapered(SegmentedGrain):
 
             # self.segments = segments
             
-            self.segments = np.fromfunction(
-                lambda i: srm.cpgrain(Ro=Ro,
-                                      Ri=self.delta_Ri * i,
-                                      length=self.delta_length),
-                (NUM_SEGMENTS,),
-                )
+            def generate_cpgrain(i):
+                return srm.cpgrain(Ro=self.Ro,Ri = self.Ri_start+self.delta_Ri * i,length = self.delta_length)
+
+            segments = np.empty((NUM_SEGMENTS,),dtype=object)
+            segments[:] = generate_cpgrain(np.arange(NUM_SEGMENTS))
+            return segments
         
         def max_yf(self):
             yf = []
