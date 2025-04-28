@@ -30,7 +30,7 @@ class SegmentedGrain():
         # def Ab(grain,x):
             # return grain.burn_area(x)
         Ab = np.vectorize(lambda grain,x: grain.burn_area(x))
-        return Ab(self.segments).sum()    
+        return Ab(self.segments, x).sum()    
     
     def pressure(self,x,nozzle,propellant):
         return (((self.burn_area(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/srm.g0)**(1/(1-propellant.n))
