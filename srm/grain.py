@@ -13,8 +13,8 @@ NUM_SEGMENTS = 1000
 
 class SegmentedGrain():
     """ Multiple grain segments composed together into a single grain """
-    def __init__(self,segments: list):
-        """ If you inherit this class, you must give it a list of segments """
+    def __init__(self,segments):
+        """ You must give this class a numpy array of segments """
         self.segments = segments
         pass
     
@@ -26,7 +26,11 @@ class SegmentedGrain():
         return sum(results)
     
     def burn_area(self,x):
-        return self.sum_segments('burn_area',x)
+        # return self.sum_segments('burn_area',x)
+        # def Ab(grain,x):
+            # return grain.burn_area(x)
+        Ab = np.vectorize(lambda grain,x: grain.burn_area(x))
+        return Ab(self.segments).sum()    
     
     def pressure(self,x,nozzle,propellant):
         return (((self.burn_area(x)/nozzle.throat_area)*propellant.a*propellant.density*propellant.cstar)/srm.g0)**(1/(1-propellant.n))
