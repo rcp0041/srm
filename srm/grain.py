@@ -74,7 +74,7 @@ class Tapered(SegmentedGrain):
 
             segments = np.empty((NUM_SEGMENTS,),dtype=object)
             segments[:] = generate_cpgrain(np.arange(NUM_SEGMENTS))
-            return segments
+            self.segments = segments
         
         def max_yf(self):
             yf = []
