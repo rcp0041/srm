@@ -55,19 +55,26 @@ class Tapered(SegmentedGrain):
             self.delta_length = self.length/NUM_SEGMENTS
             self.graintype = 'tapered_CP'
             
-            segments = []
-            for i in range(0,NUM_SEGMENTS):
-                if i == 0:
-                    Ro = self.Ro
-                    Ri = self.Ri_start
-                    L = self.delta_length
-                else:
-                    Ro = self.Ro
-                    Ri = segments[i-1].Ri + self.delta_Ri
-                    L = self.delta_length
-                segments.append(srm.cpgrain(Ro,Ri,L))
+            # segments = []
+            # for i in range(0,NUM_SEGMENTS):
+            #     if i == 0:
+            #         Ro = self.Ro
+            #         Ri = self.Ri_start
+            #         L = self.delta_length
+            #     else:
+            #         Ro = self.Ro
+            #         Ri = segments[i-1].Ri + self.delta_Ri
+            #         L = self.delta_length
+            #     segments.append(srm.cpgrain(Ro,Ri,L))
+
+            # self.segments = segments
             
-            self.segments = segments
+            self.segments = np.fromfunction(
+                lambda i: srm.cpgrain(Ro=Ro,
+                                      Ri=self.delta_Ri * i,
+                                      length=self.delta_length),
+                (NUM_SEGMENTS,),
+                )
         
         def max_yf(self):
             yf = []
